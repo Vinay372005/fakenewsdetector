@@ -1,45 +1,37 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import openai
+from openai import OpenAI
+import os
 
-st.set_page_config(page_title="Fake News Detector", layout="centered")
-st.title("🕵️ Fake News Detector")
-st.markdown("Paste a news article URL and get a verdict on its authenticity!")
+# Load your OpenAI API key from Streamlit Secrets
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-openai.api_key = st.text_input("OpenAI API Key", type="password")
-url = st.text_input("Article URL:")
+st.title("💬 Chat with GPT-3.5")
 
-def extract_article_text(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    paragraphs = soup.find_all('p')
-    article_text = "\n".join([para.get_text() for para in paragraphs])
-    return article_text[:4000]
+# User input
+user_input = st.text_input("You:", "")
 
-def analyze_article_with_gpt(article_text):
-    prompt = f"""Analyze the following news article and determine whether it appears to be fake or trustworthy.
-Provide a clear verdict ("Likely Fake" or "Likely Real") and explain your reasoning:
+# Chat history stored in session
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-{article_text}
-"""
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are an expert fact-checker."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=700
+# Show past messages
+for msg in st.session_state.messages:
+    st.markdown(f"**{msg['role'].capitalize()}**: {msg['content']}")
+
+# On submit
+if user_input:
+    # Add user message to session
+    st.session_state.messages.append({"role": "user", "content": user_input})
+
+    # Get GPT-3.5 response
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=st.session_state.messages
     )
-    return response['choices'][0]['message']['content']
 
-if url and openai.api_key:
-    if st.button("Analyze"):
-        with st.spinner("Analyzing..."):
-            try:
-                text = extract_article_text(url)
-                result = analyze_article_with_gpt(text)
-                st.subheader("🧠 GPT Verdict")
-                st.write(result)
-            except Exception as e:
-                st.error(f"Error: {e}")
+    # Add assistant response to session
+    assistant_msg = response.choices[0].message.content
+    st.session_state.messages.append({"role": "assistant", "content": assistant_msg})
+
+    # Display response
+    st.markdown(f"**Assistant**: {assistant_msg}")
