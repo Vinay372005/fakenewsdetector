@@ -1,5 +1,6 @@
 import streamlit as st
-from newspaper import Article
+import requests
+from bs4 import BeautifulSoup
 import openai
 
 st.set_page_config(page_title="Fake News Detector", layout="centered")
@@ -11,10 +12,12 @@ openai.api_key = st.text_input("OpenAI API Key", type="password")
 url = st.text_input("Article URL:")
 
 def extract_article_text(url):
-    article = Article(url)
-    article.download()
-    article.parse()
-    return article.text
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    # Basic article text extraction (simplified)
+    paragraphs = soup.find_all('p')
+    article_text = "\n".join([para.get_text() for para in paragraphs])
+    return article_text[:4000]  # Truncate for OpenAI prompt limit
 
 def analyze_article_with_gpt(article_text):
     prompt = f"""Analyze the following news article and determine whether it appears to be fake or trustworthy.
