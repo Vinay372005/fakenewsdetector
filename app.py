@@ -2,36 +2,45 @@ import streamlit as st
 from openai import OpenAI
 import os
 
-# Load your OpenAI API key from Streamlit Secrets
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+st.set_page_config(page_title="Fake News Detector", layout="centered")
+st.title("📰 Fake News Detector")
 
-st.title("💬 Chat with GPT-3.5")
+# Get OpenAI API key from environment
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    st.error("❌ OPENAI_API_KEY not found. Please add it in Streamlit Secrets.")
+    st.stop()
 
-# User input
-user_input = st.text_input("You:", "")
+# Initialize OpenAI client
+client = OpenAI(api_key=api_key)
 
-# Chat history stored in session
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# News input
+news_text = st.text_area("📝 Paste a news article or headline:")
 
-# Show past messages
-for msg in st.session_state.messages:
-    st.markdown(f"**{msg['role'].capitalize()}**: {msg['content']}")
+# Handle submission
+if st.button("🔍 Check if it's Fake or Real"):
+    if not news_text.strip():
+        st.warning("Please enter some news content.")
+    else:
+        with st.spinner("Analyzing..."):
+            prompt = (
+                "You are a news fact-checking AI. Determine if the following news article is FAKE or REAL. "
+                "Reply with 'Fake' or 'Real' followed by a short explanation.\n\n"
+                f"News: {news_text}\n\n"
+                "Answer:"
+            )
 
-# On submit
-if user_input:
-    # Add user message to session
-    st.session_state.messages.append({"role": "user", "content": user_input})
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                    max_tokens=150
+                )
 
-    # Get GPT-3.5 response
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=st.session_state.messages
-    )
+                result = response.choices[0].message.content.strip()
+                st.success("✅ Result:")
+                st.markdown(f"**{result}**")
 
-    # Add assistant response to session
-    assistant_msg = response.choices[0].message.content
-    st.session_state.messages.append({"role": "assistant", "content": assistant_msg})
-
-    # Display response
-    st.markdown(f"**Assistant**: {assistant_msg}")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
